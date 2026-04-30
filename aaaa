@@ -1,0 +1,117 @@
+import tkinter as tk
+import asyncio
+import random
+
+
+class AsyncServerMonitorApp:
+    
+    def __init__(self, root):
+        self.root = root
+        self.root.title("Async Server Monitor")
+
+        # --- Async loop ---
+        self.loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(self.loop)
+
+        # --- Config ---
+        self.refresh_seconds = tk.IntVar(value=3)
+        self.running = False
+
+        # --- Servers ---
+        self.servers = {
+            "Server A": {"status": "Unknown", "refresh": False},
+            "Server B": {"status": "Unknown", "refresh": False},
+        }
+
+        # --- UI ---
+        self.labels = {}
+        
+        olist_servers = {}
+        def aa(s):
+                if s not in olist_servers:  
+                    olist_servers[s] = False
+                
+                if olist_servers[s] == None:
+                    olist_servers[s] = False
+                elif olist_servers[s] == False:
+                    olist_servers[s] = True 
+                elif olist_servers[s] == True:
+                    olist_servers[s] = False
+                print(s)
+                print(olist_servers)
+        for i, server in enumerate(self.servers):
+            
+            tk.Label(root, text=server, font=("Arial", 12)).grid(row=i, column=0, padx=10, pady=5)
+
+            lbl = tk.Label(root, text="Idle", font=("Arial", 12))
+            lbl.grid(row=i, column=1, padx=10, pady=5)
+            
+            
+
+            b1 = tk.Checkbutton(root, text="refresh", font=("Arial", 12), command=lambda s=server: aa(s))
+            b1.grid(row=i, column=2, padx=10, pady=5)
+            
+            
+
+            self.labels[server] = lbl
+
+        # Controls
+        tk.Label(root, text="Refresh (sec):").grid(row=3, column=0)
+        tk.Entry(root, textvariable=self.refresh_seconds, width=5).grid(row=3, column=1)
+
+        tk.Button(root, text="Start", command=self.start).grid(row=4, column=0, pady=10)
+        tk.Button(root, text="Stop", command=self.stop).grid(row=4, column=1, pady=10)
+
+        # Start polling asyncio loop
+        self.poll_asyncio()
+
+    # --- Simulated async check ---
+    async def check_server(self, server_name):
+        await asyncio.sleep(0.5)  # simulate IO
+        # change this to motd object return, for now it just randomly returns online/offline
+        #olist_servers
+        print(server_name)
+        return random.choice(["Online", "Offline"])
+        
+
+    # --- Main async loop ---
+    async def monitor_loop(self):
+        while self.running:
+            tasks = [self.check_server(server) for server in self.servers]
+            results = await asyncio.gather(*tasks)
+
+            # Map results
+            result_dict = dict(zip(self.servers.keys(), results))
+
+            # Update UI (safe because we're still in main thread)
+            print(self.servers)
+            self.update_ui(result_dict)
+
+            await asyncio.sleep(self.refresh_seconds.get())
+
+    # --- UI update ---
+    def update_ui(self, results):
+        for server, status in results.items():
+            self.labels[server].config(text=status)
+
+    # --- Controls ---
+    def start(self):
+        if not self.running:
+            self.running = True
+            self.loop.create_task(self.monitor_loop())
+
+    def stop(self):
+        self.running = False
+
+    # --- Bridge asyncio with Tkinter ---
+    def poll_asyncio(self):
+        self.loop.call_soon(self.loop.stop)
+        self.loop.run_forever()
+        self.root.after(50, self.poll_asyncio)  # adjust tick speed if needed
+
+
+# --- Main ---
+if __name__ == "__main__":
+    root = tk.Tk()
+    app = AsyncServerMonitorApp(root)
+    root.mainloop()

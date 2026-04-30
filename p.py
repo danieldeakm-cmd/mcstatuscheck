@@ -1,9 +1,9 @@
-from multiprocessing import process
+#from multiprocessing import process
 import sys
 import argparse
-import multiprocessing
+#import multiprocessing
 import time
-import schedule
+#import schedule
 
 # for mcstatus
 from mcstatus import JavaServer
@@ -65,7 +65,6 @@ parser.add_argument('--retries', type=int, default=dretries, help='Number of sta
 parser.add_argument('--delay', type=float, default=ddelay, help='Delay between attempts in seconds')
 parser.add_argument('--timeout', type=float, default=dtimeout, help='Network timeout for status attempts in seconds')
 parser.add_argument('--verbose', '-v', action='store_true', help='Show debug info')
-parser.add_argument('--loop', '-l', action='store_true', help='loop')
 parser.add_argument('--testapp', type=int, default=0, help='test app')
 args = parser.parse_args()
 
@@ -174,7 +173,7 @@ def check_server_status():
             status = server.status()
             if args.verbose:
                 safe_print(f'[debug] status received on attempt {i+1} for server {server}')
-            return status
+            return status, connection
 
         except ConnectionRefusedError as ce:
             print('connection refused error, probably server loading')
@@ -192,91 +191,67 @@ def check_server_status():
 global motd_text
 motd_text = None
 
+#stop = False
 def main():
-    if JavaServer is None:
-        safe_print('<mcstatus not installed>')
-        sys.exit(1)
+    try:
+        stop = False
+        while stop == False:
+            motd_text = None
+            if JavaServer is None:
+                safe_print('<mcstatus not installed>')
+                sys.exit(1)
 
-    status = check_server_status()
-    if args.verbose:
-        print('[debug] final status:', status)
+            status, connection = check_server_status()
+            if args.testapp == 3:
+                    label2.config(text=f'ping: {connection}')
 
-    
-    if status is None:
-        # check for case when status is none but no error occurred
-        error_msg = 'OSError: Server did not respond with any information! loading or offline'
-        safe_print(error_msg)
-        #motd_text = error_msg
-        global motd_text
-        motd_text = 'Server did not respond with any information! loading or offline'
-    
-       
-    if motd_text is None:
-        
-        motd_text = extract_motd_text(status)
-        safe_print(motd_text or 'none')
-    # Show popup if we got a MOTD and it's not the error message
-    if 'Server did not respond with any information!' in motd_text or  'server is offline' in motd_text:
-        return False
-        
-    else:
-        try:
-            notification.notify(
-            title="Hello!",
-            message=motd_text,
-            timeout=5  # seconds
-            )
-            return True
-            #this is the popup code which we are not useing anymore as we have replaced it with notifications
-            ("""
-            root = tk.Tk()
-            root.withdraw()  # Hide the main window
-            messagebox.showinfo('Minecraft Server MOTD', motd_text)
-            root.destroy()
-            """)
-        except Exception as e:
-            safe_print(f'[popup error] {e}')
-
-
-if __name__ == '__main__':
-    if args.loop:
-        r = False
-        def rset():
-            global r
-            r = True
-        def takeinput():
-            global a
-            a = input(">")
-
-        def rm():
-            global r
-            r = main()
-            '''
-            process = multiprocessing.Process(target = takeinput)
-            process.start()
-            time.sleep(2)
-            process.terminate()
-            process.join()
-            try:
-                if a != "":
-                    r = True
-            except Exception:
-                pass
-            '''
-        schedule.every(2).seconds.do(rm)
-                                                        
-        while r == False:
-            schedule.run_pending()
+            if args.verbose:
+                print('[debug] final status:', status)
+            
+            if status is None:
+                # check for case when status is none but no error occurred
+                error_msg = 'OSError: Server did not respond with any information! loading or offline'
+                safe_print(error_msg)
+                #motd_text = error_msg
+                #global motd_text
+                motd_text = 'Server did not respond with any information! loading or offline'
+                if args.testapp == 3:
+                    label.config(text=motd_text)
+            
+            if motd_text is None:
+                
+                motd_text = extract_motd_text(status)
+                safe_print(motd_text or 'none')
+                if args.testapp == 3:
+                    label.config(text=motd_text)
+            # Show popup if we got a MOTD and it's not the error message
+            if 'Server did not respond with any information!' in motd_text or  'server is offline' in motd_text:
+                print('e')
+                
+            else:
+                try:
+                    notification.notify(
+                    title="Hello!",
+                    message=motd_text,
+                    timeout=5  # seconds
+                    )
+                    break
+                    #this is the popup code which we are not useing anymore as we have replaced it with notifications
+                    ("""
+                    root = tk.Tk()
+                    root.withdraw()  # Hide the main window
+                    messagebox.showinfo('Minecraft Server MOTD', motd_text)
+                    root.destroy()
+                    """)
+                except Exception as e:
+                    safe_print(f'[popup error] {e}')
+            time.sleep(5)
+            print('checking again...')
+        print('done')            
+    except Exception as e:
+        print('ah')            
 
 
-            #something
-            ('''
-            app = tk.Tk()
-            app.title("test grid")
-            app.geometry("500x350")
-            button = tk.Button(app,text="Exit", command=lambda:[app.destroy(), rset()])
-            button.pack(pady=20)
-            app.mainloop()
-            ''')
-    else:
-        main()
+if __name__ == '__main__':    
+    main()
+
